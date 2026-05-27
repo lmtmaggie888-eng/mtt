@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String        @id @default(cuid())
+  wechatOpenId        String        @unique
+  displayName         String?
+  timezone            String        @default("Asia/Shanghai")
+  morningReminderTime String        @default("08:30")
+  isActive            Boolean       @default(true)
+  tasks               Task[]
+  reminderLogs        ReminderLog[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model Task {
+  id                String          @id @default(cuid())
+  userId            String
+  sourceType        String
+  sourceMessageText String
+  title             String
+  category          TaskCategory
+  status            TaskStatus      @default(OPEN)
+  scheduledDate     DateTime?
+  scheduledTimeText String?
+  collaboratorName  String?
+  projectName       String?
+  parseConfidence   Float?
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parseAudits       TaskParseAudit[]
+}
+
+model TaskParseAudit {
+  id               String   @id @default(cuid())
+  taskId           String
+  rawText          String
+  detectedCategory String
+  detectedDateText String?
+  resolvedDate     DateTime?
+  confidence       Float?
+  parserVersion    String
+  createdAt        DateTime @default(now())
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model ReminderLog {
+  id              String   @id @default(cuid())
+  userId          String
+  reminderType    String
+  scheduledFor    DateTime
+  payloadPreview  String
+  deliveryStatus  String
+  deliveryResponse String?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum TaskCategory {
+  WORK
+  SIDE_BUSINESS
+  BUY
+  LIFE
+  IDEA
+}
+
+enum TaskStatus {
+  OPEN
+  COMPLETED
+}
