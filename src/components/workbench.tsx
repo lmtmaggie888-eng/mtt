@@ -66,12 +66,14 @@ export function Workbench() {
   const [isLoading, setIsLoading] = useState(true);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<EditingDraft | null>(null);
+  const [draftingDate, setDraftingDate] = useState<string | null>(null);
+  const [calendarDraftText, setCalendarDraftText] = useState("");
 
   useEffect(() => {
     void refreshAll();
   }, []);
 
-  const monthAnchors = listMonthAnchors(anchorDate, 3);
+  const monthAnchors = listMonthAnchors(anchorDate, 1);
   const routineTasks = useMemo(() => expandRoutinesToTasks(routines, monthAnchors), [routines, monthAnchors]);
   const allTasks = useMemo(() => [...routineTasks, ...tasks], [routineTasks, tasks]);
   const workWeekDays = useMemo(() => buildWorkWeekDays(anchorDate), [anchorDate]);
@@ -147,6 +149,30 @@ export function Workbench() {
         : `已记录到「${getCategoryLabel(parsed.category)}」，先放进待办池，等你之后再安排`,
     );
     setQuickInput("");
+  }
+
+  async function addTaskOnDate(date: string) {
+    const text = calendarDraftText.trim();
+    if (!text) {
+      setDraftingDate(null);
+      return;
+    }
+
+    await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        openId: "web-preview-user",
+        anchorDate: date,
+        scheduledDate: date,
+      }),
+    });
+    await refreshAll();
+    setSelectedDate(date);
+    setDraftingDate(null);
+    setCalendarDraftText("");
+    setMessage(`已添加到 ${date}`);
   }
 
   async function assignTaskToDate(taskId: string, targetDate: string) {
@@ -318,6 +344,19 @@ export function Workbench() {
                 onToggleTask={toggleTask}
                 onEditTask={beginEdit}
                 onDeleteTask={removeTask}
+                draftingDate={draftingDate}
+                calendarDraftText={calendarDraftText}
+                onStartDraft={(date) => {
+                  setSelectedDate(date);
+                  setDraftingDate(date);
+                  setCalendarDraftText("");
+                }}
+                onDraftTextChange={setCalendarDraftText}
+                onSaveDraft={addTaskOnDate}
+                onCancelDraft={() => {
+                  setDraftingDate(null);
+                  setCalendarDraftText("");
+                }}
               />
             ) : null}
 
@@ -505,6 +544,12 @@ function MonthBoard({
   onToggleTask,
   onEditTask,
   onDeleteTask,
+  draftingDate,
+  calendarDraftText,
+  onStartDraft,
+  onDraftTextChange,
+  onSaveDraft,
+  onCancelDraft,
 }: {
   monthAnchors: string[];
   tasks: Task[];
@@ -518,6 +563,12 @@ function MonthBoard({
   onToggleTask: (taskId: string) => Promise<void>;
   onEditTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => Promise<void>;
+  draftingDate: string | null;
+  calendarDraftText: string;
+  onStartDraft: (date: string) => void;
+  onDraftTextChange: (text: string) => void;
+  onSaveDraft: (date: string) => Promise<void>;
+  onCancelDraft: () => void;
 }) {
   return (
     <div className="mt-4 space-y-6">
@@ -550,6 +601,7 @@ function MonthBoard({
 
                     const dayTasks = sortDayTasks(tasks.filter((task) => task.scheduledDate && isSameDay(task.scheduledDate, date)));
                     const isSelected = date === selectedDate;
+                    const isDrafting = draftingDate === date;
                     const dayIndex = new Date(`${date}T00:00:00`).getDay();
                     const isRestDay = dayIndex === 0 || dayIndex === 1;
 
@@ -565,7 +617,10 @@ function MonthBoard({
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        onClick={() => onSelectDate(date)}
+                        onClick={() => {
+                          onSelectDate(date);
+                          onStartDraft(date);
+                        }}
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={async (event) => {
                           event.preventDefault();
@@ -598,6 +653,29 @@ function MonthBoard({
                             ))
                           )}
                         </div>
+                        {isDrafting ? (
+                          <div className="calendar-inline-draft" onClick={(event) => event.stopPropagation()}>
+                            <input
+                              autoFocus
+                              className="calendar-inline-input"
+                              value={calendarDraftText}
+                              onChange={(event) => onDraftTextChange(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  void onSaveDraft(date);
+                                }
+                                if (event.key === "Escape") {
+                                  onCancelDraft();
+                                }
+                              }}
+                              placeholder="写入这一天..."
+                            />
+                            <button className="calendar-inline-save" onClick={() => void onSaveDraft(date)} type="button">
+                              加
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}

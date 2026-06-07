@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createTaskFromParsedMessage, listTasks } from "@/lib/task-store";
-import { parseQuickInput } from "@/lib/workbench-utils";
+import { getTodayIso, parseQuickInput } from "@/lib/workbench-utils";
 
 export async function GET() {
   const tasks = await listTasks();
@@ -12,14 +12,18 @@ export async function POST(request: Request) {
     text?: string;
     openId?: string;
     anchorDate?: string;
+    scheduledDate?: string;
   };
 
   if (!body.text?.trim()) {
     return NextResponse.json({ error: "text is required" }, { status: 400 });
   }
 
-  const anchorDate = body.anchorDate ?? "2026-05-08";
+  const anchorDate = body.anchorDate ?? getTodayIso();
   const parsed = parseQuickInput(body.text, anchorDate);
+  if (body.scheduledDate) {
+    parsed.scheduledDate = body.scheduledDate;
+  }
   const task = await createTaskFromParsedMessage({
     openId: body.openId ?? "web-preview-user",
     rawInput: body.text,

@@ -4,7 +4,17 @@ const weekdayLabels = ["周日", "周一", "周二", "周三", "周四", "周五
 const workWeekOrder = [2, 3, 4, 5, 6, 0, 1];
 
 export function getTodayIso() {
-  return "2026-05-09";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return `${year}-${month}-${day}`;
 }
 
 export function toIsoDate(input: string | Date) {
